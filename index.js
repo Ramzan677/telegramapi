@@ -10,54 +10,40 @@ const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN
 });
 
+// Developer Branding & Credits
 const metaInfo = {
   developer: "Ramzan Ahsan",
   community_link: "https://chat.whatsapp.com/FiZBn0BykHX47d1iHLOay1"
 };
 
-// Root Health Check Route
+// Root Route - Welcome & API Documentation
 app.get('/', (req, res) => {
   res.json({
     status: "Online",
-    mode: "Debug Mode",
+    message: "Telegram Data Search API Active",
     ...metaInfo,
-    debug_endpoints: {
-      random_sample: "/api/debug/sample",
-      raw_phone_search: "/api/debug/phone/:phone",
-      raw_username_search: "/api/debug/username/:nick"
+    endpoints: {
+      search_by_phone: "/api/search/phone/:phone",
+      search_by_username: "/api/search/username/:nick",
+      search_by_id: "/api/search/id/:telegram_id"
     }
   });
 });
 
-// 1. Debug: Single Random Record Check (Columns Structure dekhne ke liye)
-app.get('/api/debug/sample', async (req, res) => {
+// 1. Phone Number Search Endpoint
+app.get('/api/search/phone/:phone', async (req, res) => {
   try {
-    const result = await db.execute('SELECT * FROM telegram LIMIT 5');
-    res.json({
-      success: true,
-      mode: "Sample Raw Data",
-      ...metaInfo,
-      columns_found: result.columns,
-      total_rows: result.rows.length,
-      sample_data: result.rows
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message, ...metaInfo });
-  }
-});
-
-// 2. Debug: Phone Search Raw Output
-app.get('/api/debug/phone/:phone', async (req, res) => {
-  try {
+    const queryPhone = req.params.phone.replace(/[^0-9]/g, ''); // Clean non-numeric input
     const result = await db.execute({
-      sql: 'SELECT * FROM telegram WHERE phone = ? LIMIT 5',
-      args: [req.params.phone]
+      sql: 'SELECT * FROM telegram WHERE phone LIKE ? LIMIT 50',
+      args: [`%${queryPhone}%`]
     });
+
     res.json({
       success: true,
       query: req.params.phone,
+      total_found: result.rows.length,
       ...metaInfo,
-      count: result.rows.length,
       data: result.rows
     });
   } catch (err) {
@@ -65,18 +51,39 @@ app.get('/api/debug/phone/:phone', async (req, res) => {
   }
 });
 
-// 3. Debug: Username Search Raw Output
-app.get('/api/debug/username/:nick', async (req, res) => {
+// 2. Username / Nick Search Endpoint
+app.get('/api/search/username/:nick', async (req, res) => {
   try {
     const result = await db.execute({
-      sql: 'SELECT * FROM telegram WHERE nick = ? LIMIT 5',
-      args: [req.params.nick]
+      sql: 'SELECT * FROM telegram WHERE nick LIKE ? OR name LIKE ? LIMIT 50',
+      args: [`%${req.params.nick}%`, `%${req.params.nick}%`]
     });
+
     res.json({
       success: true,
       query: req.params.nick,
+      total_found: result.rows.length,
       ...metaInfo,
-      count: result.rows.length,
+      data: result.rows
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message, ...metaInfo });
+  }
+});
+
+// 3. Telegram ID (adapteruserid) Search Endpoint
+app.get('/api/search/id/:id', async (req, res) => {
+  try {
+    const result = await db.execute({
+      sql: 'SELECT * FROM telegram WHERE adapteruserid = ? LIMIT 10',
+      args: [req.params.id]
+    });
+
+    res.json({
+      success: true,
+      query: req.params.id,
+      total_found: result.rows.length,
+      ...metaInfo,
       data: result.rows
     });
   } catch (err) {
